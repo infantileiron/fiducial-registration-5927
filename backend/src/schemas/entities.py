@@ -11,6 +11,10 @@ class DatasetInput(InputModel):
  csv_text:str=Field(min_length=10,max_length=350000)
 class RenameDataset(InputModel):
  name:str=Field(min_length=2,max_length=100)
+class DatasetVersionInput(InputModel):
+ # 整批替换点对；source 留空则沿用当前版本的来源文件名。
+ csv_text:str=Field(min_length=10,max_length=350000)
+ source:str=Field(default='',max_length=100)
 class FrameInput(InputModel):
  name:str=Field(min_length=2,max_length=100)
  dataset_id:str

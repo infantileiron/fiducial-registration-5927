@@ -41,7 +41,17 @@ docker compose exec -T backend python -m scripts.seed_demo
 
 CSV列id,sx,sy,sz,tx,ty,tz，3—500组。ID为唯一1—30位字母数字下划线连字符；坐标有限且绝对值≤1e6毫米，全部6值完整，拒绝短行、重复ID、NaN/Inf。数据按ID稳定排序。几何共线/重合不隐式删除，在worker明确失败。
 
-本工程只接受mm与right-handed xyz，不自动换轴、换单位。源与目标帧必须有非空且不同名称。约定列向量 y=R*x+t；CSV每行先源后目标。研究保存完整points、帧名称/单位/轴向、阈值、预算、seed、约定与源文件，规范JSON SHA256绑定。worker仅读快照；数据集后续改名不影响历史报告，既有点对/帧/研究没有修改接口。
+本工程只接受mm与right-handed xyz，不自动换轴、换单位。源与目标帧必须有非空且不同名称。约定列向量 y=R*x+t；CSV每行先源后目标。研究保存完整points、帧名称/单位/轴向、阈值、预算、seed、约定与源文件，并锁定创建时的数据集版本号（dataset_version），规范JSON SHA256绑定。worker仅读快照；数据集改名与后续整批更新不影响历史报告，帧/研究没有修改接口。
+
+### 点对整批更新与版本可追溯
+
+现场补测通过 `PUT /datasets/{id}/points` 整批替换点对并推进版本，版本链保存在不可变的 `dataset_versions` 表（append-only，永不更新或删除）：
+
+- 先全量解析校验再开事务：短行、重复ID、NaN/Inf等任一坏行整批退回（422），不写入任何版本，当前数据保持不变。
+- 版本身份由点对内容的规范JSON SHA256决定：重复上传相同内容（即使文件名不同）返回200且 `changed=false`，不产生新版本。
+- 有效更新在单事务内写入新版本并切换 `datasets.current_version` 指针（PostgreSQL下对数据集行 `FOR UPDATE` 加锁），外部读到的永远是完整的旧版或完整的新版；并发创建快照时，数据集指针与其点对来自同一事务视图，不会拼到半套数据。
+- 研究快照内嵌完整点对并记录 `dataset_version`；更新后旧研究、运行结果、复核与报告均不改变，旧版点对仍可经 `GET /datasets/{id}/versions/{version}` 查看，并可基于旧研究重新提交计算。
+- 报告CSV新增 `dataset_version` 列，归档证据可追溯到具体点对版本。前端"标志点对"页可完成整批更新，并以当前版/历史版标签区分版本链与逐版点对明细。
 
 RANSAC阈值[1e-6,100]mm、迭代1—2000、seed在[0,2147483647]；默认0.5mm/400/2405，最多10轮精炼。NumPy.float64计算，原始与结果数值以Python双精度JSON数字持久化于PostgreSQL，不在后端先做显示舍入。
 
@@ -66,7 +76,7 @@ RANSAC阈值[1e-6,100]mm、迭代1—2000、seed在[0,2147483647]；默认0.5mm/
 | 数值 | NumPy2.2.1，Kabsch SVD + 自实现固定seed RANSAC |
 | 异步/数据库 | Redis7.4 / 独立worker / PostgreSQL16 |
 
-80个代码源文件，其中src内76个职责文件。backend/src含routes/controllers/services/models/schemas/middlewares/utils/constants/config；frontend/src含api/stores/types/components/common/hooks/pages/router/utils/constants。迁移DDL在backend/migrations，advisory lock保护首次建表。自然键insert-only seed，重复不新增、不覆盖用户修改；失败记日志不阻断API。
+83个代码源文件，其中src内76个职责文件。backend/src含routes/controllers/services/models/schemas/middlewares/utils/constants/config，backend/tests覆盖点对版本化语义（去重、坏行整批退回、并发完整性、快照绑定与历史不可变）；frontend/src含api/stores/types/components/common/hooks/pages/router/utils/constants。迁移DDL在backend/migrations，advisory lock保护首次建表。自然键insert-only seed，重复不新增、不覆盖用户修改；失败记日志不阻断API。
 
 固定种子2405：60组3D点，模拟旋转Rz(22°)Ry(−11°)、t=(12,−7,4.5)mm、坐标高斯噪声sd=.03mm，前8个目标额外偏移形成离群；算法未接收离群真值标签。默认阈值下最终52内点/8阈值外。所有真实测试/截图/报告仅在批次test-artifacts/gb-2405。
 

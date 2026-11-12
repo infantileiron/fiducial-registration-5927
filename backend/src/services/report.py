@@ -13,7 +13,7 @@ def create(data):
 def download(id):
  report=repo.get('reports',id);run=repo.get('runs',report['run_id']);r=run['result'];review=repo.get('reviews',report['review_id'])
  if review['status']!='approved':raise HTTPException(403,'复核未通过')
- out=io.StringIO();w=csv.writer(out);w.writerow(['report','convention','source_frame','target_frame','unit','threshold_mm','seed','iterations','checksum']);w.writerow([safe_cell(report['title']),r['convention'],safe_cell(r['frame']['source_frame']),safe_cell(r['frame']['target_frame']),'mm',r['threshold_mm'],r['seed'],r['iterations'],r['checksum']]);w.writerow([])
+ out=io.StringIO();w=csv.writer(out);w.writerow(['report','convention','source_frame','target_frame','unit','threshold_mm','seed','iterations','checksum','dataset_version']);w.writerow([safe_cell(report['title']),r['convention'],safe_cell(r['frame']['source_frame']),safe_cell(r['frame']['target_frame']),'mm',r['threshold_mm'],r['seed'],r['iterations'],r['checksum'],r.get('dataset_version',1)]);w.writerow([])
  for method in ['full','robust']:
   m=r[method];w.writerow([method,'det_R',m['det_R'],'rmse_all',m.get('rmse_all',m['rmse'])]);w.writerow(['R_11','R_12','R_13','t_mm'])
   for i in range(3):w.writerow(m['R'][i]+[m['t'][i]])

@@ -6,6 +6,16 @@ class FiducialDataset:
  name:str
  source:str
  points:list[dict]
+ current_version:int=1
+ created_at:str=''
+@dataclass
+class DatasetVersion:
+ id:str
+ dataset_id:str
+ version:int
+ points:list[dict]
+ source:str
+ content_hash:str
  created_at:str=''
 @dataclass
 class FrameSpec:
@@ -28,6 +38,7 @@ class RegistrationStudy:
  seed:int
  snapshot:dict
  checksum:str
+ dataset_version:int=1
  created_at:str=''
 @dataclass
 class RegistrationRun:
